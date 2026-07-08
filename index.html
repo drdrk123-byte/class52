@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>용답초 오이짱이지반</title>
+<title>동지네 교실</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link
@@ -100,12 +100,22 @@
   }
   .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; align-items: center; }
   .error-text { color: var(--stamp-red); font-size: 0.85rem; }
-  .student-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px;
+  .student-grid, .animal-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px;
     margin: 14px 0; max-height: 50vh; overflow-y: auto;
   }
-  .student-chip { background: var(--sky); border: none; border-radius: 8px; padding: 10px 6px; font-weight: 700; cursor: pointer; }
+  .student-chip {
+    background: var(--sky); border: none; border-radius: 8px; padding: 10px 6px; font-weight: 700; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.95rem;
+  }
+  .student-chip .num { font-size: 0.75rem; color: var(--accent-dark); }
+  .student-chip.empty { background: #eee; color: #99a3ab; }
   .student-chip:hover { filter: brightness(0.95); }
+  .animal-chip {
+    background: var(--mint); border: none; border-radius: 8px; padding: 10px 4px;
+    font-size: 1.8rem; cursor: pointer;
+  }
+  .animal-chip:hover { filter: brightness(0.95); }
   .muted { color: #6b7a86; }
   .muted.small { font-size: 0.85rem; }
   .timetable { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
@@ -144,11 +154,11 @@
   .emoji-option { font-size: 1.5rem; background: white; border: 2px solid transparent; border-radius: 8px; padding: 4px 8px; cursor: pointer; }
   .emoji-option.selected { border-color: var(--accent); background: var(--mint); }
   .emotion-editor input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 2px solid var(--sand); margin-top: 4px; }
-  .roster-editor { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-  .roster-editor input { padding: 8px 10px; border-radius: 8px; border: 2px solid var(--sand); }
-  .roster-editor input.num { width: 70px; }
+  .roster-panel { margin-bottom: 10px; }
   .roster-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
   .roster-tag { background: var(--sand); border-radius: 999px; padding: 4px 10px; font-size: 0.85rem; display:flex; align-items:center; gap:6px; }
+  .size-editor { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .size-editor input { width: 70px; padding: 6px 8px; border-radius: 8px; border: 2px solid var(--sand); }
 </style>
 </head>
 <body>
@@ -172,6 +182,8 @@ const DEFAULT_MISSIONS = [
   { id: 'homework',   title: '오늘 과제를 다했나요?' },
   { id: 'desk-line',  title: '책상 줄을 잘 맞췄나요?' },
 ];
+// 학생 수만큼 서로 다른 동물을 고를 수 있도록 넉넉히 준비 (기본 16명 + 여유분)
+const ANIMALS = ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🦉','🐢','🐬'];
 
 function todayKey() {
   const now = new Date();
@@ -200,7 +212,10 @@ function saveJSON(key, value) {
 
 /* ===================== 전역 상태 ===================== */
 
-let roster = loadJSON('roster', []); // [{id, name, number}]
+// roster: [{id, number, animal}]  -- 학생이 스스로 번호+동물을 선택하면 등록됨
+let roster = loadJSON('roster', []);
+let studentCount = Number(loadJSON('studentCount', 16));
+
 let currentStudent = JSON.parse(sessionStorage.getItem('currentStudent') || 'null');
 
 let teacherExpiry = Number(sessionStorage.getItem('teacherExpiry') || 0);
@@ -217,8 +232,12 @@ if (!missionsState) {
 
 let emotionsState = loadJSON('emotions_' + todayKey(), { students: {} });
 
+// 학생 선택 흐름 상태
 let pickerOpen = false;
-let pendingStudent = null;
+let pickerStep = 'number'; // 'number' | 'animal'
+let selectedNumber = null;   // 새로 등록 중인 번호
+let pendingStudent = null;   // 확인 대기 중인 학생(기존 or 신규)
+
 let teacherModalOpen = false;
 let teacherError = '';
 let noticeEditing = false;
@@ -226,8 +245,6 @@ let noticeDraft = '';
 let timetableEditing = false;
 let timetableDraft = null;
 let newMissionText = '';
-let rosterNameDraft = '';
-let rosterNumberDraft = '';
 let emotionDraftEmoji = null;
 let emotionDraftMemo = '';
 
@@ -267,14 +284,40 @@ setInterval(() => {
 document.addEventListener('click', touchTeacherActivity);
 document.addEventListener('keydown', touchTeacherActivity);
 
-/* ===================== 학생 선택 ===================== */
+/* ===================== 학생 선택 (번호 + 동물) ===================== */
 
-function openPicker() { pickerOpen = true; render(); }
-function closePicker() { pickerOpen = false; pendingStudent = null; render(); }
-function pickStudent(id) {
-  pendingStudent = roster.find(s => s.id === id) || null;
+function studentLabel(s) { return s ? `${s.animal} ${s.number}번` : ''; }
+function usedAnimals() { return new Set(roster.map(s => s.animal)); }
+function findByNumber(n) { return roster.find(s => s.number === n) || null; }
+
+function openPicker() { pickerOpen = true; pickerStep = 'number'; selectedNumber = null; render(); }
+function closePicker() { pickerOpen = false; pendingStudent = null; selectedNumber = null; pickerStep = 'number'; render(); }
+
+function pickNumber(n) {
+  const existing = findByNumber(n);
+  if (existing) {
+    pendingStudent = existing;
+  } else {
+    selectedNumber = n;
+    pickerStep = 'animal';
+  }
   render();
 }
+
+function pickAnimal(animal) {
+  if (usedAnimals().has(animal)) return; // 이미 다른 학생이 선택함
+  const entry = { id: 'stu_' + selectedNumber, number: selectedNumber, animal };
+  roster.push(entry);
+  roster.sort((a,b) => a.number - b.number);
+  saveJSON('roster', roster);
+  pendingStudent = entry;
+  pickerStep = 'number';
+  selectedNumber = null;
+  render();
+}
+
+function backToNumberStep() { pickerStep = 'number'; selectedNumber = null; render(); }
+
 function confirmPick() {
   currentStudent = pendingStudent;
   sessionStorage.setItem('currentStudent', JSON.stringify(currentStudent));
@@ -288,19 +331,20 @@ function cancelPick() { pendingStudent = null; render(); }
 
 /* ===================== 명렬표 관리 (교사 모드) ===================== */
 
-function addRosterStudent() {
-  const name = rosterNameDraft.trim();
-  const number = Number(rosterNumberDraft);
-  if (!name || !number) return;
-  roster.push({ id: 'stu_' + Date.now(), name, number });
-  roster.sort((a,b) => a.number - b.number);
-  saveJSON('roster', roster);
-  rosterNameDraft = '';
-  rosterNumberDraft = '';
+function updateStudentCount(n) {
+  studentCount = Math.max(1, Number(n) || 1);
+  saveJSON('studentCount', studentCount);
   render();
 }
-function removeRosterStudent(id) {
+function resetOneStudent(id) {
+  if (!confirm('이 학생의 번호/동물 선택을 초기화할까요? 다시 선택해야 해요.')) return;
   roster = roster.filter(s => s.id !== id);
+  saveJSON('roster', roster);
+  render();
+}
+function resetAllStudents() {
+  if (!confirm('전체 학생의 번호/동물 선택을 모두 초기화할까요?')) return;
+  roster = [];
   saveJSON('roster', roster);
   render();
 }
@@ -399,7 +443,7 @@ function renderHeader() {
       <h1>🌱 동지네 교실</h1>
       <div class="header-actions">
         <button class="pill-btn" onclick="openPicker()">
-          ${currentStudent ? '🙋 ' + esc(currentStudent.name) : '👤 이름 선택'}
+          ${currentStudent ? '🙋 ' + studentLabel(currentStudent) : '👤 번호·동물 선택'}
         </button>
         ${isTeacher
           ? `<button class="pill-btn teacher-active" onclick="logoutTeacher()">👩‍🏫 선생님 모드 · 끄기</button>`
@@ -472,27 +516,33 @@ function renderTimetable() {
   `;
 }
 
-function renderRosterEditor() {
+function renderRosterPanel() {
   if (!isTeacher) return '';
   return `
-    <div class="roster-editor">
-      <input class="num" id="rosterNum" type="number" placeholder="번호" value="${esc(rosterNumberDraft)}" oninput="rosterNumberDraft=this.value"/>
-      <input id="rosterName" placeholder="이름" value="${esc(rosterNameDraft)}" oninput="rosterNameDraft=this.value"/>
-      <button class="pill-btn small" onclick="addRosterStudent()">학생 추가</button>
-    </div>
-    <div class="roster-list">
-      ${roster.map(s => `<span class="roster-tag">${s.number}. ${esc(s.name)} <button class="remove-x" onclick="removeRosterStudent('${s.id}')">✕</button></span>`).join('') || '<span class="muted small">등록된 학생이 없어요.</span>'}
+    <div class="roster-panel">
+      <div class="size-editor">
+        <span class="muted small">학생 수</span>
+        <input type="number" min="1" value="${studentCount}" onchange="updateStudentCount(this.value)"/>
+        <span class="muted small">명</span>
+        <button class="ghost-btn small" onclick="resetAllStudents()">전체 초기화</button>
+      </div>
+      <div class="roster-list">
+        ${roster.length === 0
+          ? '<span class="muted small">아직 아무도 번호/동물을 선택하지 않았어요.</span>'
+          : roster.map(s => `<span class="roster-tag">${s.animal} ${s.number}번 <button class="remove-x" onclick="resetOneStudent('${s.id}')" title="이 학생 초기화">✕</button></span>`).join('')
+        }
+      </div>
     </div>
   `;
 }
 
 function renderMissions() {
   const items = missionsState.items;
-  let head = `<th>이름</th>` + items.map(m => `
+  let head = `<th>학생</th>` + items.map(m => `
     <th>${esc(m.title)}${isTeacher ? `<button class="remove-x" onclick="removeMission('${m.id}')" title="미션 삭제">✕</button>` : ''}</th>
   `).join('');
 
-  let body = roster.map(s => {
+  let body = roster.slice().sort((a,b)=>a.number-b.number).map(s => {
     const done = isAllDone(s.id);
     const cells = items.map(m => {
       const checked = (missionsState.completions[s.id] || []).includes(m.id);
@@ -500,7 +550,7 @@ function renderMissions() {
       return `<td><button class="check-box ${checked?'checked':''}" ${editable?'':'disabled'} onclick="toggleMission('${s.id}','${m.id}')">${checked?'✓':''}</button></td>`;
     }).join('');
     return `<tr>
-      <td class="student-name-cell ${done?'stamped':''}">${done?'<span class="stamp">완료!</span>':''}${esc(s.name)}</td>
+      <td class="student-name-cell ${done?'stamped':''}">${done?'<span class="stamp">완료!</span>':''}${studentLabel(s)}</td>
       ${cells}
     </tr>`;
   }).join('');
@@ -513,12 +563,12 @@ function renderMissions() {
           <input id="newMissionInput" placeholder="추가 미션 입력 (기본 5개 미션 외 추가하고 싶을 때)" value="${esc(newMissionText)}" oninput="newMissionText=this.value" onkeydown="if(event.key==='Enter'){addMission()}"/>
           <button class="pill-btn small" onclick="addMission()">추가</button>
         </div>
-        ${renderRosterEditor()}
+        ${renderRosterPanel()}
       ` : ''}
       ${items.length === 0
         ? `<p class="muted">오늘 등록된 미션이 없어요.</p>`
         : (roster.length === 0
-            ? `<p class="muted">등록된 학생이 없어요. 선생님 모드에서 명렬표를 먼저 등록해주세요.</p>`
+            ? `<p class="muted">아직 등록된 학생이 없어요. 학생들이 상단의 '번호·동물 선택' 버튼으로 먼저 등록해주세요.</p>`
             : `<div class="mission-table-wrap"><table class="mission-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`
           )
       }
@@ -534,7 +584,7 @@ function renderEmotions() {
         const student = roster.find(s => s.id === sid);
         return `<div class="emotion-chip">
           <span class="emoji-big">${info.emoji}</span>
-          ${isTeacher && info.memo ? `<span class="emotion-memo">${student ? esc(student.name)+': ' : ''}${esc(info.memo)}</span>` : ''}
+          ${isTeacher && info.memo ? `<span class="emotion-memo">${student ? studentLabel(student)+': ' : ''}${esc(info.memo)}</span>` : ''}
         </div>`;
       }).join('');
 
@@ -542,7 +592,7 @@ function renderEmotions() {
   if (currentStudent) {
     editor = `
       <div class="emotion-editor">
-        <p class="muted small">${esc(currentStudent.name)} 학생, 오늘 기분은 어때요?</p>
+        <p class="muted small">${studentLabel(currentStudent)} 학생, 오늘 기분은 어때요?</p>
         <div class="emoji-picker">
           ${EMOJIS.map(e => `<button class="emoji-option ${emotionDraftEmoji===e?'selected':''}" onclick="pickEmoji('${e}')">${e}</button>`).join('')}
         </div>
@@ -554,7 +604,7 @@ function renderEmotions() {
       </div>
     `;
   } else {
-    editor = `<p class="muted small">이름을 먼저 선택하면 기분을 남길 수 있어요.</p>`;
+    editor = `<p class="muted small">번호와 동물을 먼저 선택하면 기분을 남길 수 있어요.</p>`;
   }
 
   return `
@@ -566,23 +616,51 @@ function renderEmotions() {
   `;
 }
 
+function renderPickerModal() {
+  // 확인 단계가 아니면서 picker가 열려있을 때만 보임
+  const open = pickerOpen && !pendingStudent;
+
+  let inner = '';
+  if (pickerStep === 'number') {
+    let numberButtons = '';
+    for (let n = 1; n <= studentCount; n++) {
+      const existing = findByNumber(n);
+      numberButtons += `<button class="student-chip ${existing?'':'empty'}" onclick="pickNumber(${n})">
+        <span>${existing ? existing.animal : '➕'}</span>
+        <span class="num">${n}번</span>
+      </button>`;
+    }
+    inner = `
+      <h3>내 번호를 골라주세요</h3>
+      <div class="student-grid">${numberButtons}</div>
+      <button class="ghost-btn" onclick="closePicker()">닫기</button>
+    `;
+  } else {
+    const used = usedAnimals();
+    const animalButtons = ANIMALS.map(a => `
+      <button class="animal-chip" ${used.has(a)?'disabled style="opacity:0.25;cursor:not-allowed;"':''} onclick="pickAnimal('${a}')">${a}</button>
+    `).join('');
+    inner = `
+      <h3>${selectedNumber}번, 나만의 동물을 골라주세요</h3>
+      <p class="muted small">이미 흐리게 표시된 동물은 다른 친구가 선택했어요.</p>
+      <div class="animal-grid">${animalButtons}</div>
+      <button class="ghost-btn" onclick="backToNumberStep()">번호 다시 고르기</button>
+    `;
+  }
+
+  return `<div class="modal-backdrop ${open ? '' : 'hidden'}" onclick="closePicker()">
+    <div class="modal-card wide" onclick="event.stopPropagation()">${inner}</div>
+  </div>`;
+}
+
 function renderModals() {
   let html = '';
 
-  html += `<div class="modal-backdrop ${pickerOpen && !pendingStudent ? '' : 'hidden'}" onclick="closePicker()">
-    <div class="modal-card wide" onclick="event.stopPropagation()">
-      <h3>내 이름을 골라주세요</h3>
-      <div class="student-grid">
-        ${roster.map(s => `<button class="student-chip" onclick="pickStudent('${s.id}')">${s.number}. ${esc(s.name)}</button>`).join('') ||
-          '<p class="muted">등록된 학생이 없어요. 선생님 모드에서 명렬표를 먼저 등록해주세요.</p>'}
-      </div>
-      <button class="ghost-btn" onclick="closePicker()">닫기</button>
-    </div>
-  </div>`;
+  html += renderPickerModal();
 
   html += `<div class="modal-backdrop ${pendingStudent ? '' : 'hidden'}" onclick="cancelPick()">
     <div class="modal-card" onclick="event.stopPropagation()">
-      <h3>${pendingStudent ? esc(pendingStudent.name) : ''} 학생이 맞나요?</h3>
+      <h3>${pendingStudent ? studentLabel(pendingStudent) : ''} 학생이 맞나요?</h3>
       <div class="modal-actions">
         <button class="ghost-btn" onclick="cancelPick()">아니에요</button>
         <button class="pill-btn" onclick="confirmPick()">네, 맞아요</button>
