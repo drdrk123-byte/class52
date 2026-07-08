@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>용답초 오이짱이지반</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --paper: #faf6ef;
+    --cork-a: #d9c19a;
+    --cork-b: #c9ab7c;
+    --ink: #2b3a4a;
+    --accent: #4c7a5e;
+    --accent-dark: #365a44;
+    --highlight: #f4c95d;
+    --stamp-red: #c1443f;
+    --pink: #f2b8c6;
+    --sky: #a9cbe8;
+    --mint: #b8e0d2;
+    --sand: #ecd9ae;
+    --font-display: 'Gaegu', cursive;
+    --font-body: 'Noto Sans KR', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background:
+      radial-gradient(circle at 10% 15%, rgba(255,255,255,0.15) 0, transparent 40%),
+      repeating-radial-gradient(circle at center, var(--cork-a) 0, var(--cork-a) 2px, var(--cork-b) 3px, var(--cork-b) 4px);
+    min-height: 100vh;
+  }
+  .app-shell { max-width: 1280px; margin: 0 auto; padding: 24px 20px 60px; }
+  .app-header {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
+  }
+  .app-header h1 {
+    font-family: var(--font-display); font-size: 2.4rem; color: var(--accent-dark);
+    text-shadow: 1px 1px 0 rgba(255,255,255,0.5); margin: 0;
+  }
+  .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .board {
+    background: var(--paper); border-radius: 6px; padding: 20px 22px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.18), 0 2px 0 rgba(0,0,0,0.05);
+    position: relative; margin-bottom: 20px;
+  }
+  .board::before {
+    content: ''; position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+    width: 16px; height: 16px;
+    background: radial-gradient(circle at 35% 35%, #ff8a80, #c1443f);
+    border-radius: 50%; box-shadow: 0 2px 3px rgba(0,0,0,0.4);
+  }
+  .notice-board { transform: rotate(-0.4deg); }
+  .board-grid { display: grid; grid-template-columns: 1.1fr 1.3fr 1fr; gap: 20px; align-items: start; }
+  .timetable-board { transform: rotate(0.3deg); }
+  .mission-board { transform: rotate(-0.2deg); }
+  .emotion-board { transform: rotate(0.4deg); }
+  @media (max-width: 980px) { .board-grid { grid-template-columns: 1fr; } }
+  .board-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .board-header h2 { font-family: var(--font-display); font-size: 1.5rem; margin: 0; color: var(--accent-dark); }
+  .notice-content { font-size: 1.15rem; line-height: 1.6; white-space: pre-wrap; min-height: 2em; }
+  .notice-edit textarea {
+    width: 100%; font-family: var(--font-body); font-size: 1rem;
+    border: 2px dashed var(--sand); border-radius: 8px; padding: 10px; resize: vertical;
+  }
+  .pill-btn {
+    background: var(--accent); color: white; border: none; padding: 9px 18px;
+    border-radius: 999px; font-family: var(--font-body); font-weight: 700; font-size: 0.9rem;
+    cursor: pointer; box-shadow: 0 3px 0 var(--accent-dark); transition: transform 0.1s;
+  }
+  .pill-btn:hover { transform: translateY(-1px); }
+  .pill-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-dark); }
+  .pill-btn.small { padding: 6px 12px; font-size: 0.8rem; }
+  .pill-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+  .pill-btn.teacher-active { background: var(--stamp-red); box-shadow: 0 3px 0 #8a2e2a; }
+  .ghost-btn {
+    background: transparent; border: 2px solid var(--accent); color: var(--accent-dark);
+    padding: 7px 16px; border-radius: 999px; font-weight: 700; font-size: 0.85rem; cursor: pointer;
+  }
+  .ghost-btn.small { padding: 5px 12px; font-size: 0.78rem; }
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(43,58,74,0.45);
+    display: flex; align-items: center; justify-content: center; z-index: 50;
+  }
+  .modal-backdrop.hidden { display: none; }
+  .modal-card { background: var(--paper); border-radius: 12px; padding: 24px; width: min(90vw, 380px); box-shadow: 0 12px 30px rgba(0,0,0,0.3); }
+  .modal-card.wide { width: min(90vw, 560px); }
+  .modal-card h3 { font-family: var(--font-display); font-size: 1.3rem; margin-top: 0; }
+  .modal-card input {
+    width: 100%; padding: 10px; border-radius: 8px; border: 2px solid var(--sand);
+    font-size: 1rem; margin: 8px 0;
+  }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; align-items: center; }
+  .error-text { color: var(--stamp-red); font-size: 0.85rem; }
+  .student-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px;
+    margin: 14px 0; max-height: 50vh; overflow-y: auto;
+  }
+  .student-chip { background: var(--sky); border: none; border-radius: 8px; padding: 10px 6px; font-weight: 700; cursor: pointer; }
+  .student-chip:hover { filter: brightness(0.95); }
+  .muted { color: #6b7a86; }
+  .muted.small { font-size: 0.85rem; }
+  .timetable { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  .timetable th, .timetable td { border: 1px solid #e3d8c3; padding: 8px 6px; text-align: center; }
+  .timetable th { background: var(--sand); font-family: var(--font-display); font-size: 1.05rem; }
+  .timetable .period-label { background: var(--sand); font-weight: 700; }
+  .timetable input { width: 100%; border: 1px solid #ccc; border-radius: 4px; text-align: center; padding: 4px; }
+  .today-col { background: rgba(76,122,94,0.12); font-weight: 700; }
+  .mission-editor { display: flex; gap: 8px; margin-bottom: 12px; }
+  .mission-editor input { flex: 1; padding: 8px 10px; border-radius: 8px; border: 2px solid var(--sand); }
+  .mission-table-wrap { overflow-x: auto; }
+  .mission-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .mission-table th, .mission-table td { border: 1px solid #e3d8c3; padding: 8px; text-align: center; white-space: nowrap; }
+  .mission-table th { background: var(--mint); font-family: var(--font-display); }
+  .student-name-cell { font-weight: 700; position: relative; text-align: left !important; transition: background 0.3s; }
+  .student-name-cell.stamped { background: var(--highlight); }
+  .stamp {
+    display: inline-block; color: var(--stamp-red); border: 2px solid var(--stamp-red); border-radius: 6px;
+    font-family: var(--font-display); font-size: 0.75rem; padding: 0 4px; margin-right: 6px;
+    transform: rotate(-8deg); animation: pop 0.25s ease-out;
+  }
+  @keyframes pop { from { transform: rotate(-8deg) scale(0.5); opacity: 0; } to { transform: rotate(-8deg) scale(1); opacity: 1; } }
+  .check-box {
+    width: 30px; height: 30px; border-radius: 6px; border: 2px solid var(--accent);
+    background: white; cursor: pointer; font-weight: 900; color: var(--accent);
+  }
+  .check-box.checked { background: var(--accent); color: white; }
+  .check-box:disabled { cursor: not-allowed; opacity: 0.5; }
+  .remove-x { background: none; border: none; color: var(--stamp-red); cursor: pointer; font-size: 0.75rem; margin-left: 4px; }
+  .emotion-wall { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; min-height: 40px; }
+  .emotion-chip { background: var(--pink); border-radius: 10px; padding: 6px 10px; display: flex; align-items: center; gap: 6px; }
+  .emoji-big { font-size: 1.4rem; }
+  .emotion-memo { font-size: 0.75rem; color: var(--ink); }
+  .emotion-editor { border-top: 2px dashed var(--sand); padding-top: 12px; }
+  .emoji-picker { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+  .emoji-option { font-size: 1.5rem; background: white; border: 2px solid transparent; border-radius: 8px; padding: 4px 8px; cursor: pointer; }
+  .emoji-option.selected { border-color: var(--accent); background: var(--mint); }
+  .emotion-editor input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 2px solid var(--sand); margin-top: 4px; }
+  .roster-editor { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .roster-editor input { padding: 8px 10px; border-radius: 8px; border: 2px solid var(--sand); }
+  .roster-editor input.num { width: 70px; }
+  .roster-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .roster-tag { background: var(--sand); border-radius: 999px; padding: 4px 10px; font-size: 0.85rem; display:flex; align-items:center; gap:6px; }
+</style>
+</head>
+<body>
+<div id="app" class="app-shell"></div>
+
+<script>
+/* ===================== 데이터 저장 (localStorage) =====================
+   서버 없이 이 브라우저(기기)에만 저장됩니다.
+   교실 TV 한 대에 띄워놓고 쓰는 것을 전제로 합니다. */
+
+const TEACHER_PASSWORD = 'yd502';
+const TEACHER_TIMEOUT_MS = 10 * 60 * 1000; // 10분 미조작 시 자동 잠금
+const MEMO_MAX = 40;
+const EMOJIS = ['😀','🙂','😐','😢','😠','😴','🤩','😅'];
+const WEEKDAYS = ['월','화','수','목','금'];
+const PERIODS = [1,2,3,4,5,6];
+const DEFAULT_MISSIONS = [
+  { id: 'workbook',   title: '오늘 배움공책을 다 썼나요?' },
+  { id: 'chromebook', title: '크롬북 정리했나요?' },
+  { id: 'desk-clean', title: '책상 주변을 깔끔하게 정리했나요?' },
+  { id: 'homework',   title: '오늘 과제를 다했나요?' },
+  { id: 'desk-line',  title: '책상 줄을 잘 맞췄나요?' },
+];
+
+function todayKey() {
+  const now = new Date();
+  const kst = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const y = kst.getFullYear();
+  const m = String(kst.getMonth()+1).padStart(2,'0');
+  const d = String(kst.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
+}
+function todayWeekdayIndex() {
+  const now = new Date();
+  const kst = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const day = kst.getDay();
+  if (day === 0 || day === 6) return -1;
+  return day - 1;
+}
+function loadJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch { return fallback; }
+}
+function saveJSON(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+/* ===================== 전역 상태 ===================== */
+
+let roster = loadJSON('roster', []); // [{id, name, number}]
+let currentStudent = JSON.parse(sessionStorage.getItem('currentStudent') || 'null');
+
+let teacherExpiry = Number(sessionStorage.getItem('teacherExpiry') || 0);
+let isTeacher = teacherExpiry > Date.now();
+
+let notice = loadJSON('notice_' + todayKey(), '');
+let timetableDays = loadJSON('timetable_days', WEEKDAYS.map(()=>PERIODS.map(()=>'')));
+
+let missionsState = loadJSON('missions_' + todayKey(), null);
+if (!missionsState) {
+  missionsState = { items: DEFAULT_MISSIONS.map(m => ({...m})), completions: {} };
+  saveJSON('missions_' + todayKey(), missionsState);
+}
+
+let emotionsState = loadJSON('emotions_' + todayKey(), { students: {} });
+
+let pickerOpen = false;
+let pendingStudent = null;
+let teacherModalOpen = false;
+let teacherError = '';
+let noticeEditing = false;
+let noticeDraft = '';
+let timetableEditing = false;
+let timetableDraft = null;
+let newMissionText = '';
+let rosterNameDraft = '';
+let rosterNumberDraft = '';
+let emotionDraftEmoji = null;
+let emotionDraftMemo = '';
+
+/* ===================== 교사 모드 ===================== */
+
+function loginTeacher(pw) {
+  if (pw === TEACHER_PASSWORD) {
+    isTeacher = true;
+    teacherExpiry = Date.now() + TEACHER_TIMEOUT_MS;
+    sessionStorage.setItem('teacherExpiry', String(teacherExpiry));
+    teacherModalOpen = false;
+    teacherError = '';
+    render();
+    return true;
+  }
+  teacherError = '비밀번호가 올바르지 않아요.';
+  render();
+  return false;
+}
+function logoutTeacher() {
+  isTeacher = false;
+  sessionStorage.removeItem('teacherExpiry');
+  render();
+}
+function touchTeacherActivity() {
+  if (!isTeacher) return;
+  teacherExpiry = Date.now() + TEACHER_TIMEOUT_MS;
+  sessionStorage.setItem('teacherExpiry', String(teacherExpiry));
+}
+setInterval(() => {
+  if (isTeacher && Date.now() > teacherExpiry) {
+    isTeacher = false;
+    sessionStorage.removeItem('teacherExpiry');
+    render();
+  }
+}, 15000);
+document.addEventListener('click', touchTeacherActivity);
+document.addEventListener('keydown', touchTeacherActivity);
+
+/* ===================== 학생 선택 ===================== */
+
+function openPicker() { pickerOpen = true; render(); }
+function closePicker() { pickerOpen = false; pendingStudent = null; render(); }
+function pickStudent(id) {
+  pendingStudent = roster.find(s => s.id === id) || null;
+  render();
+}
+function confirmPick() {
+  currentStudent = pendingStudent;
+  sessionStorage.setItem('currentStudent', JSON.stringify(currentStudent));
+  emotionDraftEmoji = (emotionsState.students[currentStudent.id]||{}).emoji || null;
+  emotionDraftMemo = (emotionsState.students[currentStudent.id]||{}).memo || '';
+  pendingStudent = null;
+  pickerOpen = false;
+  render();
+}
+function cancelPick() { pendingStudent = null; render(); }
+
+/* ===================== 명렬표 관리 (교사 모드) ===================== */
+
+function addRosterStudent() {
+  const name = rosterNameDraft.trim();
+  const number = Number(rosterNumberDraft);
+  if (!name || !number) return;
+  roster.push({ id: 'stu_' + Date.now(), name, number });
+  roster.sort((a,b) => a.number - b.number);
+  saveJSON('roster', roster);
+  rosterNameDraft = '';
+  rosterNumberDraft = '';
+  render();
+}
+function removeRosterStudent(id) {
+  roster = roster.filter(s => s.id !== id);
+  saveJSON('roster', roster);
+  render();
+}
+
+/* ===================== 알림장 ===================== */
+
+function startNoticeEdit() { noticeDraft = notice; noticeEditing = true; render(); }
+function cancelNoticeEdit() { noticeEditing = false; render(); }
+function saveNotice() {
+  notice = noticeDraft;
+  saveJSON('notice_' + todayKey(), notice);
+  noticeEditing = false;
+  render();
+}
+
+/* ===================== 시간표 ===================== */
+
+function startTimetableEdit() {
+  timetableDraft = JSON.parse(JSON.stringify(timetableDays));
+  timetableEditing = true;
+  render();
+}
+function cancelTimetableEdit() { timetableEditing = false; timetableDraft = null; render(); }
+function updateTimetableCell(dayIdx, periodIdx, value) {
+  timetableDraft[dayIdx][periodIdx] = value;
+}
+function saveTimetable() {
+  timetableDays = timetableDraft;
+  saveJSON('timetable_days', timetableDays);
+  timetableEditing = false;
+  timetableDraft = null;
+  render();
+}
+
+/* ===================== 미션 보드 ===================== */
+
+function persistMissions() { saveJSON('missions_' + todayKey(), missionsState); }
+function addMission() {
+  const title = newMissionText.trim();
+  if (!title) return;
+  missionsState.items.push({ id: 'm' + Date.now(), title });
+  newMissionText = '';
+  persistMissions();
+  render();
+}
+function removeMission(missionId) {
+  missionsState.items = missionsState.items.filter(m => m.id !== missionId);
+  Object.keys(missionsState.completions).forEach(sid => {
+    missionsState.completions[sid] = (missionsState.completions[sid]||[]).filter(id => id !== missionId);
+  });
+  persistMissions();
+  render();
+}
+function toggleMission(studentId, missionId) {
+  const current = missionsState.completions[studentId] || [];
+  missionsState.completions[studentId] = current.includes(missionId)
+    ? current.filter(id => id !== missionId)
+    : [...current, missionId];
+  persistMissions();
+  render();
+}
+function isAllDone(studentId) {
+  const items = missionsState.items;
+  if (items.length === 0) return false;
+  const done = missionsState.completions[studentId] || [];
+  return items.every(m => done.includes(m.id));
+}
+function canEditRow(studentId) {
+  return isTeacher || (currentStudent && currentStudent.id === studentId);
+}
+
+/* ===================== 감정 스티커 ===================== */
+
+function pickEmoji(e) { emotionDraftEmoji = e; render(); }
+function saveEmotion() {
+  if (!currentStudent || !emotionDraftEmoji) return;
+  emotionsState.students[currentStudent.id] = {
+    emoji: emotionDraftEmoji,
+    memo: emotionDraftMemo,
+  };
+  saveJSON('emotions_' + todayKey(), emotionsState);
+  render();
+}
+
+/* ===================== 렌더링 ===================== */
+
+function esc(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function renderHeader() {
+  return `
+    <header class="app-header">
+      <h1>🌱 동지네 교실</h1>
+      <div class="header-actions">
+        <button class="pill-btn" onclick="openPicker()">
+          ${currentStudent ? '🙋 ' + esc(currentStudent.name) : '👤 이름 선택'}
+        </button>
+        ${isTeacher
+          ? `<button class="pill-btn teacher-active" onclick="logoutTeacher()">👩‍🏫 선생님 모드 · 끄기</button>`
+          : `<button class="pill-btn" onclick="teacherModalOpen=true; render()">🔒 선생님 모드</button>`
+        }
+      </div>
+    </header>
+  `;
+}
+
+function renderNotice() {
+  if (noticeEditing) {
+    return `
+      <section class="board notice-board">
+        <div class="board-header"><h2>📌 오늘의 알림장</h2></div>
+        <div class="notice-edit">
+          <textarea id="noticeTextarea" rows="4" placeholder="오늘의 알림장 내용을 적어주세요">${esc(noticeDraft)}</textarea>
+          <div class="modal-actions">
+            <button class="ghost-btn" onclick="cancelNoticeEdit()">취소</button>
+            <button class="pill-btn" onclick="noticeDraft=document.getElementById('noticeTextarea').value; saveNotice()">저장</button>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+  return `
+    <section class="board notice-board">
+      <div class="board-header">
+        <h2>📌 오늘의 알림장</h2>
+        ${isTeacher ? `<button class="ghost-btn small" onclick="startNoticeEdit()">수정</button>` : ''}
+      </div>
+      <p class="notice-content">${notice ? esc(notice) : '오늘은 등록된 알림장이 없어요.'}</p>
+    </section>
+  `;
+}
+
+function renderTimetable() {
+  const todayIdx = todayWeekdayIndex();
+  const view = timetableEditing ? timetableDraft : timetableDays;
+  const headerBtn = timetableEditing
+    ? `<div class="modal-actions">
+         <button class="ghost-btn small" onclick="cancelTimetableEdit()">취소</button>
+         <button class="pill-btn small" onclick="saveTimetable()">저장</button>
+       </div>`
+    : (isTeacher ? `<button class="ghost-btn small" onclick="startTimetableEdit()">수정</button>` : '');
+
+  let rows = '';
+  PERIODS.forEach((p, pIdx) => {
+    rows += `<tr><td class="period-label">${p}교시</td>`;
+    WEEKDAYS.forEach((_, dIdx) => {
+      const val = (view[dIdx] && view[dIdx][pIdx]) || '';
+      const cls = dIdx === todayIdx ? 'today-col' : '';
+      if (timetableEditing) {
+        rows += `<td class="${cls}"><input value="${esc(val)}" onchange="updateTimetableCell(${dIdx},${pIdx},this.value)"/></td>`;
+      } else {
+        rows += `<td class="${cls}">${val ? esc(val) : '-'}</td>`;
+      }
+    });
+    rows += `</tr>`;
+  });
+
+  return `
+    <section class="board timetable-board">
+      <div class="board-header"><h2>🗓️ 학급 시간표</h2>${headerBtn}</div>
+      <table class="timetable">
+        <thead><tr><th></th>${WEEKDAYS.map((d,i)=>`<th class="${i===todayIdx?'today-col':''}">${d}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </section>
+  `;
+}
+
+function renderRosterEditor() {
+  if (!isTeacher) return '';
+  return `
+    <div class="roster-editor">
+      <input class="num" id="rosterNum" type="number" placeholder="번호" value="${esc(rosterNumberDraft)}" oninput="rosterNumberDraft=this.value"/>
+      <input id="rosterName" placeholder="이름" value="${esc(rosterNameDraft)}" oninput="rosterNameDraft=this.value"/>
+      <button class="pill-btn small" onclick="addRosterStudent()">학생 추가</button>
+    </div>
+    <div class="roster-list">
+      ${roster.map(s => `<span class="roster-tag">${s.number}. ${esc(s.name)} <button class="remove-x" onclick="removeRosterStudent('${s.id}')">✕</button></span>`).join('') || '<span class="muted small">등록된 학생이 없어요.</span>'}
+    </div>
+  `;
+}
+
+function renderMissions() {
+  const items = missionsState.items;
+  let head = `<th>이름</th>` + items.map(m => `
+    <th>${esc(m.title)}${isTeacher ? `<button class="remove-x" onclick="removeMission('${m.id}')" title="미션 삭제">✕</button>` : ''}</th>
+  `).join('');
+
+  let body = roster.map(s => {
+    const done = isAllDone(s.id);
+    const cells = items.map(m => {
+      const checked = (missionsState.completions[s.id] || []).includes(m.id);
+      const editable = canEditRow(s.id);
+      return `<td><button class="check-box ${checked?'checked':''}" ${editable?'':'disabled'} onclick="toggleMission('${s.id}','${m.id}')">${checked?'✓':''}</button></td>`;
+    }).join('');
+    return `<tr>
+      <td class="student-name-cell ${done?'stamped':''}">${done?'<span class="stamp">완료!</span>':''}${esc(s.name)}</td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  return `
+    <section class="board mission-board">
+      <div class="board-header"><h2>🎯 오늘의 미션</h2></div>
+      ${isTeacher ? `
+        <div class="mission-editor">
+          <input id="newMissionInput" placeholder="추가 미션 입력 (기본 5개 미션 외 추가하고 싶을 때)" value="${esc(newMissionText)}" oninput="newMissionText=this.value" onkeydown="if(event.key==='Enter'){addMission()}"/>
+          <button class="pill-btn small" onclick="addMission()">추가</button>
+        </div>
+        ${renderRosterEditor()}
+      ` : ''}
+      ${items.length === 0
+        ? `<p class="muted">오늘 등록된 미션이 없어요.</p>`
+        : (roster.length === 0
+            ? `<p class="muted">등록된 학생이 없어요. 선생님 모드에서 명렬표를 먼저 등록해주세요.</p>`
+            : `<div class="mission-table-wrap"><table class="mission-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`
+          )
+      }
+    </section>
+  `;
+}
+
+function renderEmotions() {
+  const entries = Object.entries(emotionsState.students || {});
+  const wall = entries.length === 0
+    ? `<p class="muted">아직 아무도 기분을 남기지 않았어요.</p>`
+    : entries.map(([sid, info]) => {
+        const student = roster.find(s => s.id === sid);
+        return `<div class="emotion-chip">
+          <span class="emoji-big">${info.emoji}</span>
+          ${isTeacher && info.memo ? `<span class="emotion-memo">${student ? esc(student.name)+': ' : ''}${esc(info.memo)}</span>` : ''}
+        </div>`;
+      }).join('');
+
+  let editor;
+  if (currentStudent) {
+    editor = `
+      <div class="emotion-editor">
+        <p class="muted small">${esc(currentStudent.name)} 학생, 오늘 기분은 어때요?</p>
+        <div class="emoji-picker">
+          ${EMOJIS.map(e => `<button class="emoji-option ${emotionDraftEmoji===e?'selected':''}" onclick="pickEmoji('${e}')">${e}</button>`).join('')}
+        </div>
+        <input id="emotionMemoInput" maxlength="${MEMO_MAX}" placeholder="왜 그런 기분인지 한 줄로 적어주세요" value="${esc(emotionDraftMemo)}" oninput="emotionDraftMemo=this.value; document.getElementById('memoCount').textContent=this.value.length"/>
+        <div class="modal-actions">
+          <span class="muted small"><span id="memoCount">${emotionDraftMemo.length}</span>/${MEMO_MAX}</span>
+          <button class="pill-btn small" ${emotionDraftEmoji?'':'disabled'} onclick="saveEmotion()">저장</button>
+        </div>
+      </div>
+    `;
+  } else {
+    editor = `<p class="muted small">이름을 먼저 선택하면 기분을 남길 수 있어요.</p>`;
+  }
+
+  return `
+    <section class="board emotion-board">
+      <div class="board-header"><h2>💛 오늘의 기분</h2></div>
+      <div class="emotion-wall">${wall}</div>
+      ${editor}
+    </section>
+  `;
+}
+
+function renderModals() {
+  let html = '';
+
+  html += `<div class="modal-backdrop ${pickerOpen && !pendingStudent ? '' : 'hidden'}" onclick="closePicker()">
+    <div class="modal-card wide" onclick="event.stopPropagation()">
+      <h3>내 이름을 골라주세요</h3>
+      <div class="student-grid">
+        ${roster.map(s => `<button class="student-chip" onclick="pickStudent('${s.id}')">${s.number}. ${esc(s.name)}</button>`).join('') ||
+          '<p class="muted">등록된 학생이 없어요. 선생님 모드에서 명렬표를 먼저 등록해주세요.</p>'}
+      </div>
+      <button class="ghost-btn" onclick="closePicker()">닫기</button>
+    </div>
+  </div>`;
+
+  html += `<div class="modal-backdrop ${pendingStudent ? '' : 'hidden'}" onclick="cancelPick()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <h3>${pendingStudent ? esc(pendingStudent.name) : ''} 학생이 맞나요?</h3>
+      <div class="modal-actions">
+        <button class="ghost-btn" onclick="cancelPick()">아니에요</button>
+        <button class="pill-btn" onclick="confirmPick()">네, 맞아요</button>
+      </div>
+    </div>
+  </div>`;
+
+  html += `<div class="modal-backdrop ${teacherModalOpen ? '' : 'hidden'}" onclick="teacherModalOpen=false; render()">
+    <form class="modal-card" onclick="event.stopPropagation()" onsubmit="event.preventDefault(); loginTeacher(document.getElementById('teacherPwInput').value)">
+      <h3>선생님 모드 전환</h3>
+      <p>비밀번호를 입력해주세요.</p>
+      <input id="teacherPwInput" type="password" placeholder="비밀번호"/>
+      ${teacherError ? `<div class="error-text">${esc(teacherError)}</div>` : ''}
+      <div class="modal-actions">
+        <button type="button" class="ghost-btn" onclick="teacherModalOpen=false; teacherError=''; render()">취소</button>
+        <button type="submit" class="pill-btn">확인</button>
+      </div>
+    </form>
+  </div>`;
+
+  return html;
+}
+
+function render() {
+  document.getElementById('app').innerHTML = `
+    ${renderHeader()}
+    ${renderNotice()}
+    <div class="board-grid">
+      ${renderTimetable()}
+      ${renderMissions()}
+      ${renderEmotions()}
+    </div>
+    ${renderModals()}
+  `;
+}
+
+render();
+</script>
+</body>
+</html>
